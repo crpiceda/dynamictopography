@@ -1,0 +1,404 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "j3ZLjaKpkK5t"
+   },
+   "source": [
+    "# <center> 10. Neotectonics of intraplate and mantle diapir regions</center>\n",
+    "# <center> Dynamic Topography</center>\n",
+    "## <center>Lab exercice</center>\n",
+    "## <center>Constanza Rodriguez Piceda (GFZ Potsdam -  University of Potsdam)</center>  \n",
+    "\n",
+    "<center><img src='https://drive.google.com/uc?id=1WjeihxlqiNmx67Cp6OPT9PSqGUnUjQR8'></center>  \n",
+    "<center>Hogard et al. (2021)</center>\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "1dbm9lKHlegN"
+   },
+   "source": [
+    "In this excercise we are going to calculate the residual topography (RT) of the Asia-Africa-Arabia-Europe domain using the workflow of Gvirtzman et al. (2016) paper.\n",
+    "\n",
+    "<center><img src='https://drive.google.com/uc?id=1OpboANp9G8aM3k7sWing4umdtYOcL_t_'></center>\n",
+    "<center><img src='https://drive.google.com/uc?id=1d99d9UGYeJ2cKXHnS1vc8Zf7Hg2svqCO'></center>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "ehPYiGZ5aTgs"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "install first the packages that are not by default in jupyter notebook.\n",
+    "Run in the Anaconda terminal the following command\n",
+    "'''\n",
+    "#pip install shapely cartopy --no-binary shapely --no-binary cartopy --force"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "XGqpMxKdalkx"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "now that the missing packages were installed, we are going to import all the packages\n",
+    "'''\n",
+    "import os # for handling paths\n",
+    "import pandas as pd # data analysis \n",
+    "import numpy as np # for working with arrays\n",
+    "from matplotlib import rcParams # for tunning plotting parameters\n",
+    "import matplotlib.pyplot as plt # for plotting\n",
+    "import cartopy.crs as ccrs # for handling projections\n",
+    "import matplotlib.cm as cm # for colorbar\n",
+    "import matplotlib.colors as colors # for colorbar\n",
+    "\n",
+    "print('all packages were successfully installed')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "THk7o_ocayJ4"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "change the path to the folder were the data is stored\n",
+    "'''\n",
+    "os.chdir(r'C:\\Users\\piceda\\dynamictopography\\data')\n",
+    "print('changed folder succesfully')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "QLyNG4t3a1AH"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "open the data\n",
+    "'''\n",
+    "topography=pd.read_csv('topography.txt', \n",
+    "                       sep=' ', \n",
+    "                       usecols=[0,1,2], \n",
+    "                       skiprows=1, \n",
+    "                       names=['x','y','z']) # topography in meters\n",
+    "ds=pd.read_csv('rho_sed.txt', \n",
+    "               sep=' ', \n",
+    "               usecols=[0,1,2], \n",
+    "               skiprows=1, \n",
+    "               names=['x','y','ds']) # sediment density in kg/m3\n",
+    "lc=pd.read_csv('l_crust.txt', \n",
+    "               sep=' ', \n",
+    "               usecols=[0,1,2], \n",
+    "               skiprows=1, \n",
+    "               names=['x','y','lc']) # crustal thickness (crystalline crust+sediments) in km\n",
+    "ls=pd.read_csv('l_sed.txt', \n",
+    "               sep=' ', \n",
+    "               usecols=[0,1,2], \n",
+    "               skiprows=1,\n",
+    "               names=['x','y','ls']) # sediment thickness in km\n",
+    "\n",
+    "topography.head() # show the first four rows of the topography data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "2iby21Eha4NV"
+   },
+   "outputs": [],
+   "source": [
+    "''' \n",
+    "define the constants\n",
+    "'''\n",
+    "dw=1030 # water density (kg/m3)\n",
+    "dasth=3190 # asthenosphere density (kg/m3)\n",
+    "tasth=1350 # temperature at lithospheric-asthenospheric boundary (LAB)\n",
+    "alpha=3.5e-5 # volume coefficient of thermal expansion\n",
+    "h0=2400 # meters - average topography at mid-ocean ridges in meters (Lachenbruch and Morgan, 1990)\n",
+    "\n",
+    "print('constants defined succesfully')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "aDVSfT2ha5ec"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "change the data to SI units (from km to m)\n",
+    "'''\n",
+    "lc['lc']=lc['lc']*1000\n",
+    "ls['ls']=ls['ls']*1000\n",
+    "ds['ds']=ds['ds']*1000\n",
+    "\n",
+    "print('changed to SI units succesfully')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "r8xBGCAEa9Vj"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "plot topography, crustal thickness and sediment thickness\n",
+    "'''\n",
+    "# we need to grid the data first. This means to convert the data from a 1D array to a matrix with n*m dimensions\n",
+    "ny=topography['y'].idxmax()+1 # y dimension\n",
+    "nx=int(len(topography['y'])/ny) # x dimension\n",
+    "\n",
+    "# now we can grid the data\n",
+    "gridx=np.reshape(topography['x'].values,(nx,ny)) #grid for x coordinates\n",
+    "gridy=np.reshape(topography['y'].values,(nx,ny)) # grid for y coordinates\n",
+    "gridtopo=np.reshape(topography['z'].values,(nx,ny)) # grid for residual topography\n",
+    "gridlc=np.reshape(lc['lc'].values,(nx,ny)) # grid for residual topography\n",
+    "gridls=np.reshape(ls['ls'].values,(nx,ny)) # grid for residual topography\n",
+    "\n",
+    "# Initialize plot objects topography\n",
+    "projection = ccrs.PlateCarree(central_longitude=0) # set projection\n",
+    "fig1,ax1 =plt.subplots(figsize=(10,10), \n",
+    "                      subplot_kw=dict(projection=projection)) # create 'canvas' of the plot\n",
+    "\n",
+    "# plot data topography\n",
+    "levels = np.linspace(-6000, 6000, 49) # set contour levels\n",
+    "c1=ax1.contourf(gridx,gridy,gridtopo, levels, cmap=cm.terrain)\n",
+    "cbar=fig1.colorbar(c1, ax=ax1, pad=0.04, shrink=0.58, label='elevation [m]') # colorbar\n",
+    "ax1.set_xticks(np.linspace(10,60,6)) # set ticks in x\n",
+    "ax1.set_yticks(np.linspace(5,45,5)) # set ticks in y\n",
+    "ax1.coastlines() # add coastlines\n",
+    "ax1.set_title('Topography')\n",
+    "\n",
+    "# Initialize plot crustal thickness\n",
+    "fig2,ax2 =plt.subplots(figsize=(10,10), \n",
+    "                      subplot_kw=dict(projection=projection)) # create 'canvas' of the plot\n",
+    "\n",
+    "# plot data crustal thickness\n",
+    "levels = np.linspace(0, 60000, 13) # set contour levels\n",
+    "c2=ax2.contourf(gridx,gridy,gridlc, levels, cmap=cm.YlGnBu_r)\n",
+    "cbar=fig1.colorbar(c2, ax=ax2, pad=0.04, shrink=0.58, label='crustal thickness [m]') # colorbar\n",
+    "ax2.set_xticks(np.linspace(10,60,6)) # set ticks in x\n",
+    "ax2.set_yticks(np.linspace(5,45,5)) # set ticks in y\n",
+    "ax2.set_title('Crustal Thickness')\n",
+    "ax2.coastlines() # add coastlines\n",
+    "\n",
+    "# Initialize plot sediment thickness\n",
+    "fig3,ax3 =plt.subplots(figsize=(10,10), \n",
+    "                      subplot_kw=dict(projection=projection)) # create 'canvas' of the plot\n",
+    "\n",
+    "\n",
+    "# plot data sediment thickness\n",
+    "levels = np.linspace(0, 10000, 11) # set contour levels\n",
+    "c3=ax3.contourf(gridx,gridy,gridls, levels, cmap=cm.YlGnBu_r)\n",
+    "cbar=fig1.colorbar(c3, ax=ax3, pad=0.04, shrink=0.58, label='sediment thickness [m]') # colorbar\n",
+    "ax3.set_xticks(np.linspace(10,60,6)) # set ticks in x\n",
+    "ax3.set_yticks(np.linspace(5,45,5)) # set ticks in y\n",
+    "ax3.set_title('Sediment thickness')\n",
+    "ax3.coastlines() # add coastlines\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "zmMA8oXReKd_"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "calculate a correction factor to account for the water load\n",
+    "'''\n",
+    "acont=1 # for continent\n",
+    "asea=dasth/(dasth-dw) # for sea"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "_xGVD9g5eRrh"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "split the data between sea and continent area\n",
+    "'''\n",
+    "# calculate index for splitting\n",
+    "seaid=topography.index[topography['z']<0].values # index for sea\n",
+    "contid=topography.index[topography['z']>=0].values # index for continent\n",
+    "\n",
+    "# filter data according to the sea and continent using index\n",
+    "x_sea=topography['x'].iloc[seaid] # coordinate x for sea\n",
+    "y_sea=topography['y'].iloc[seaid] # coordinate y for sea\n",
+    "topo_sea=topography['z'].iloc[seaid] # topography for sea\n",
+    "ds_sea=ds['ds'].iloc[seaid] # sediment density for sea\n",
+    "lc_sea=lc['lc'].iloc[seaid] # sediment thickness for sea\n",
+    "ls_sea=ls['ls'].iloc[seaid] # crustal thickness for sea\n",
+    "\n",
+    "x_cont=topography['x'].iloc[contid] # coordinate x for continent\n",
+    "y_cont=topography['y'].iloc[contid] # coordinate y for continent\n",
+    "topo_cont=topography['z'].iloc[contid] # topography for continent\n",
+    "ds_cont=ds['ds'].iloc[contid] # sediment density for continent\n",
+    "lc_cont=lc['lc'].iloc[contid] # sediment thickness for continent\n",
+    "ls_cont=ls['ls'].iloc[contid] # crustal thickness for continent"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "IvEVjQp7ez9J"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "calculate the contribution of the crust to the topography (buoyancy)\n",
+    "'''\n",
+    "# substract the sediment thickness to the crust data to obtain the thickness of the crystalline crust\n",
+    "lcryst_cont=lc_cont-ls_cont # crystalline crust thickness (continent)\n",
+    "lcryst_sea=lc_sea-ls_sea # # crystalline crust thickness (sea)\n",
+    " \n",
+    "# assume a crystalline crustal density of 2840 kg/m3 and a sediment density of 2450 kg/m3,\n",
+    "# calculate the average crustal density including the crystalline crust and the sediments\n",
+    "dcrust_ave_cont=(lcryst_cont*2840+ls_cont*2450)/(lcryst_cont+ls_cont) # crystalline crust thickness (continent)\n",
+    "dcrust_ave_sea=(lcryst_sea*2950+ls_sea*2450)/(lcryst_sea+ls_sea) # crystalline crust thickness (sea)\n",
+    "\n",
+    "# calculate the contribution of the crust to the topography (buoyancy)\n",
+    "hc_cont=(dasth-dcrust_ave_cont)/dasth*lc_cont # bouyancy for sea\n",
+    "hc_sea=(dasth-dcrust_ave_sea)/dasth*lc_sea # buoyancy for continent"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "nSKnkNvLfgLM"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "calculate the residual topography\n",
+    "'''\n",
+    "RT_sea=topo_sea/asea+h0-hc_sea # residual topography for sea\n",
+    "RT_cont=topo_cont/acont+h0-hc_cont # residual topography for continent"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "NUFiBrd7fqJO"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "combine continent and sea data\n",
+    "'''\n",
+    "total_id=np.concatenate([seaid,contid]) # index\n",
+    "total_x=pd.concat([x_sea,x_cont]) # coordinate x\n",
+    "total_y=pd.concat([y_sea,y_cont]) # coordinate y\n",
+    "total_RT=pd.concat([RT_sea,RT_cont]) # total residual topography\n",
+    "\n",
+    "table=pd.DataFrame({'id':total_id, 'x':total_x, 'y':total_y,'RT':total_RT}) # put all columns together\n",
+    "table=table.sort_values('id') # order columns by index"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "bPEHABX9fxAB"
+   },
+   "outputs": [],
+   "source": [
+    "'''\n",
+    "plot residual topography\n",
+    "'''\n",
+    "# we need to grid the data first. This means to convert the data from a 1D array to a matrix with n*m dimensions\n",
+    "ny=table['y'].idxmax()+1 # y dimension\n",
+    "nx=int(len(total_y)/ny) # x dimension\n",
+    "\n",
+    "# now we can grid the data\n",
+    "gridx=np.reshape(table['x'].values,(nx,ny)) #grid for x coordinates\n",
+    "gridy=np.reshape(table['y'].values,(nx,ny)) # grid for y coordinates\n",
+    "gridRT=np.reshape(table['RT'].values,(nx,ny)) # grid for residual topography\n",
+    "\n",
+    "# Initialize plot objects\n",
+    "projection = ccrs.PlateCarree(central_longitude=0) # set projection\n",
+    "fig5,ax5 =plt.subplots(figsize=(10,10), \n",
+    "                      subplot_kw=dict(projection=projection)) # create 'canvas' of the plot\n",
+    "\n",
+    "\n",
+    "# plot data\n",
+    "levels = np.linspace(-5000, 1000, 25) # set contour levels\n",
+    "\n",
+    "# make the norm:  Note the center is offset so that the negative RT has more\n",
+    "# dynamic range:\n",
+    "divnorm = colors.TwoSlopeNorm(vmin=-5000, vcenter=0, vmax=1000)\n",
+    "\n",
+    "c5=ax5.contourf(gridx,gridy,gridRT, levels, cmap=cm.bwr, norm=divnorm)\n",
+    "\n",
+    "cbar=fig5.colorbar(c5, ax=ax5, pad=0.04, shrink=0.58, label='Residual topography [m]') # colorbar\n",
+    "ax5.set_xticks(np.linspace(10,60,6)) # set ticks in x\n",
+    "ax5.set_yticks(np.linspace(5,45,5)) # set ticks in y\n",
+    "ax5.set_title('Residual Topography')\n",
+    "ax5.coastlines() # add coastlines\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "colab": {
+   "authorship_tag": "ABX9TyO2DrF6QyS0P+vfR9JNzlYE",
+   "name": "DynamicTopography.ipynb",
+   "provenance": []
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 1
+}
